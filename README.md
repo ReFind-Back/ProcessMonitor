@@ -66,3 +66,70 @@ MaxHungWindows=500             ; 每次扫描最大窗口数（10-5000）
 NotifyOnTermination=0          ; 终止普通进程时是否弹窗（0=关闭，1=开启）
 StartMonitoringOnLaunch=1      ; 启动时自动开始监控（0=关闭，1=开启）
 ExcludeProcesses=              ; 排除的进程名（逗号分隔，如 notepad.exe,calc.exe）
+```
+
+> ⚠️ **重要**：配置文件必须保存为 **ANSI 编码**（系统默认代码页）
+
+---
+
+## 📁 项目文件说明
+
+| 文件 | 说明 |
+|------|------|
+| `ProcessMonitor.exe` | 主程序（从 Releases 下载） |
+| `config.ini` | 配置文件（首次运行自动生成） |
+| `monitor.log` | 日志文件 |
+| `monitor.log.old` | 轮转后的旧日志 |
+| `monitor_manual.txt` | 用户手册（完整版） |
+| `README.txt` | 手册缺失时自动创建的简易说明 |
+
+---
+
+## 🔧 从源码构建
+
+### 使用 MinGW
+```bash
+gcc -o ProcessMonitor.exe ProcessMonitor.c -lpsapi -lshell32 -luser32 -ladvapi32 -lcomctl32 -mwindows -municode
+```
+
+### 使用 MSVC (Visual Studio)
+```bash
+cl ProcessMonitor.c /FeProcessMonitor.exe /link psapi.lib shell32.lib user32.lib advapi32.lib comctl32.lib /SUBSYSTEM:WINDOWS
+```
+
+---
+
+## 📝 版本历史
+
+- **v0.48** (当前) - 代码清理，移除未使用变量，控制台彻底隐藏
+
+---
+
+## 🤝 贡献指南
+
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本仓库
+2. 创建您的特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 打开一个 Pull Request
+
+---
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+
+---
+
+## 📬 联系方式
+
+- 项目主页：[https://github.com/ReFind-Back/ProcessMonitor](https://github.com/ReFind-Back/ProcessMonitor)
+- 问题反馈：[Issues](https://github.com/ReFind-Back/ProcessMonitor/issues)
+
+---
+
+**如果这个项目对你有帮助，请给一个 ⭐️ 吧！**
+
+```
