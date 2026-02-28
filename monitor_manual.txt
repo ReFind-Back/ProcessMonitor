@@ -1,0 +1,665 @@
+# 进程监控器用户手册
+## 版本 0.48
+
+---
+
+## 目录
+1. 概述  
+2. 系统要求  
+3. 安装与运行  
+4. 配置文件 (config.ini)  
+5. 使用方法  
+6. 日志文件 (monitor.log)  
+7. 故障排除  
+8. 卸载  
+9. 常见问题解答 (FAQ)  
+10. 版本 0.48 更新内容  
+11. 已知潜在问题  
+
+---
+
+## 1. 概述
+
+进程监控器是一款轻量级的系统托盘工具，可自动检测并终止异常进程（基于高 CPU 使用率、高内存使用率或无响应的窗口）。所有操作都会记录在 `monitor.log`（UTF-8 编码）中，并自动轮转日志。您可以通过 `config.ini` 自定义监控参数和排除列表。配置文件的更改会自动重新加载，无需重启程序。
+
+**主要特点：**
+- 实时监控所有运行中的进程。
+- 终止超过 CPU、内存或挂起阈值的进程。
+- 内置系统进程保护（关键系统进程永远不会被终止，但异常会被记录，并弹出气泡提示，每个进程每5分钟最多一次）。
+- 用户可定义的排除列表。
+- 自动日志轮转，防止日志无限增长。
+- 动态配置重载 – 无需重启。
+- 每个用户会话仅允许一个实例。
+- 极少的资源占用。
+- 气泡提示频率限制，避免频繁打扰。
+- 启动时自动监控（可配置）。
+- 系统进程异常检测增加瞬时 CPU 使用率，提高检测灵敏度。
+- 配置编码警告每周仅提示一次，减少打扰。
+- 手册文件缺失时自动创建简易 README。
+- 启动时检查程序目录是否可写，并给出提示。
+- 程序退出时自动清理临时日志文件。
+- 程序运行时不显示控制台窗口，仅驻留在系统托盘。
+
+---
+
+## 2. 系统要求
+
+- **操作系统**：Windows Vista、Windows 7、Windows 8、Windows 10、Windows 11（32位或64位均可）。
+- **硬件**：至少 50 MB 可用内存，10 MB 磁盘空间。
+- **权限**：建议以管理员身份运行，以便终止大多数进程。非管理员模式下只能监控和终止当前用户拥有的进程。
+
+---
+
+## 3. 安装与运行
+
+### 3.1 安装
+- 将 `ProcessMonitor.exe` 放置在任何文件夹中（建议使用无空格或特殊字符的英文路径）。
+- 无需安装，直接运行可执行文件即可。
+
+### 3.2 首次运行
+- 首次启动时，程序会在同一文件夹中创建默认配置文件 `config.ini`。该文件以 ANSI 编码保存，确保正确读取。
+- 当第一个事件发生时，程序会创建日志文件 `monitor.log`。
+- 程序启动后会最小化到系统托盘（时钟附近），不会显示任何窗口。
+- 如果您未以管理员身份运行，将会出现警告；您仍可使用程序，但某些进程可能无法终止。
+- 默认情况下，监控会在程序启动后自动开始（可通过配置文件关闭）。
+- 如果用户手册文件 `monitor_manual.txt` 不存在，程序会自动创建一个简易的 `README.txt` 包含基本使用说明。
+- 程序启动时会检查当前文件夹是否可写（能否创建文件），如果不可写，会弹出警告提示，告知您配置和日志可能无法保存。请将程序放在可写的文件夹中，或使用管理员权限运行。
+
+### 3.3 以管理员身份运行
+右键单击可执行文件，选择“以管理员身份运行”，或在兼容性设置中设置为始终以管理员身份运行。
+
+### 3.4 多实例
+每个用户会话只允许运行一个实例。如果尝试启动第二个实例，将弹出提示框并退出程序。
+
+---
+
+## 4. 配置文件 (config.ini)
+
+配置文件是标准的 Windows INI 文件。它**必须**以 ANSI 编码（系统的默认代码页）保存，因为程序使用 Windows 的 INI 读取 API。如果您使用其他编辑器（如 Notepad++），请保存为 ANSI 格式。无 BOM 的 UTF-8 编码可能导致非 ASCII 字符读取错误。程序会在检测到编码问题时每周弹出一次气球提示，并记录日志。
+
+### 4.1 默认配置
+首次运行时，程序会创建包含以下内容的 `config.ini`：
+
+```
+[Settings]
+MonitorIntervalMs=5000
+CpuThresholdPercent=80
+MemThresholdMb=500
+HangTimeoutMs=5000
+LogMaxSizeBytes=1048576
+MaxHungWindows=500
+NotifyOnTermination=0
+StartMonitoringOnLaunch=1
+ExcludeProcesses=
+
+; Process Monitor Configuration File
+; All times are in milliseconds.
+; Edit values as needed. The program will automatically reload changes.
+; StartMonitoringOnLaunch: 1 to start monitoring automatically, 0 to start stopped.
+; NotifyOnTermination: 1 to show a balloon when a normal process is terminated, 0 to only log.
+; ExcludeProcesses: comma or semicolon separated list (e.g., notepad.exe,calc.exe)
+; Note: CPU threshold is total process CPU time (may exceed 100% on multi-core).
+; MaxHungWindows: limit number of windows to check for hanging (10-5000).
+; IMPORTANT: Save this file in ANSI encoding (system default code page).
+; If you use UTF-8 without BOM, non-ASCII characters may not be read correctly.
+```
+
+### 4.2 参数说明
+
+| 参数 | 说明 | 范围 | 默认值 |
+|------|------|------|--------|
+| MonitorIntervalMs | 扫描间隔（毫秒） | 1000 – 60000 | 5000 |
+| CpuThresholdPercent | CPU 使用率阈值（所有核心总和） | 1 – 100 | 80 |
+| MemThresholdMb | 内存使用阈值（兆字节） | 1 – 65536 | 500 |
+| HangTimeoutMs | 检测窗口挂起的超时时间（毫秒） | 1000 – 30000 | 5000 |
+| LogMaxSizeBytes | 日志文件最大字节数 | 1024 – 104857600 | 1048576 (1 MB) |
+| MaxHungWindows | 每次扫描检查的最大窗口数 | 10 – 5000 | 500 |
+| NotifyOnTermination | 终止普通进程时是否显示气泡提示 | 0 或 1 | 0 |
+| StartMonitoringOnLaunch | 程序启动时是否自动开始监控 | 0 或 1 | 1 |
+| ExcludeProcesses | 永不终止的进程名列表（逗号或分号分隔，仅文件名） | 最多 32 项 | 空 |
+
+**注意**：
+- CPU 阈值：在多核系统上，一个线程占用一个核心显示 100%，两个满负荷核心为 200%。阈值是绝对值。
+- 排除列表仅支持文件名（如 `notepad.exe`），如果包含路径分隔符（`\` 或 `/`），该条目将被忽略，并弹出气球提示（同时记录日志）。
+- 内置系统进程（如 `csrss.exe`、`services.exe` 等）始终被排除在终止之外，但仅当它们从系统目录运行时才被视为系统进程。
+
+### 4.3 动态重载
+程序每 5 秒检查一次配置文件。如果文件被修改，程序会自动重新加载设置。如果重载失败（例如文件损坏），之前的设置将保持不变，并记录错误。成功重载时不再弹窗（仅失败时每 10 分钟提示一次）。
+
+---
+
+## 5. 使用方法
+
+### 5.1 系统托盘图标
+程序驻留在系统托盘（通知区域），使用 Windows 默认的应用程序图标。
+
+### 5.2 鼠标操作
+- **双击左键**：显示一个消息框，包含程序版本和当前监控状态（ON 或 OFF）。
+- **右键单击**：打开上下文菜单，包含所有操作选项。
+
+### 5.3 上下文菜单选项
+
+| 选项 | 说明 |
+|------|------|
+| 开始监控 | 开始根据当前配置扫描进程。当监控激活时，此项目旁边会出现一个复选标记。 |
+| 停止监控 | 暂停扫描。在重新启动监控之前，不会检查或终止任何进程。 |
+| 查看日志 | 使用与 `.log` 文件关联的默认文本编辑器打开 `monitor.log`。 |
+| 编辑配置 | 使用 `.ini` 文件的默认编辑器打开 `config.ini`。 |
+| 查看手册 | 打开本手册 `monitor_manual.txt`（如果存在），否则弹出提示。 |
+| 退出 | 终止程序。监控停止，托盘图标消失。 |
+
+---
+
+## 6. 日志文件 (monitor.log)
+
+日志文件存储在与可执行文件相同的文件夹中，采用 UTF-8 编码以支持国际字符。每条日志包括时间戳、采取的操作和详细信息。
+
+### 6.1 日志条目格式
+
+**正常终止（内存可用）：**
+```
+[YYYY-MM-DD HH:MM:SS] Terminated process: <名称> (PID <pid>)
+  Reason: <原因>
+  CPU: <值>%  Memory: <值> MB
+  Path: <可执行文件完整路径>
+```
+
+**系统进程异常（内存可用）：**
+```
+[YYYY-MM-DD HH:MM:SS] SUSPICIOUS SYSTEM PROCESS: <名称> (PID <pid>)
+  Reason: <原因>
+  CPU: <值>%  Memory: <值> MB
+  Path: <可执行文件完整路径>
+  This may indicate malware infection. (If this is normal system activity, you can ignore this warning.)
+```
+
+### 6.2 示例
+```
+[2025-03-21 14:30:15] Terminated process: chrome.exe (PID 1234)
+  Reason: High CPU: 95.3% (threshold 80%)
+  CPU: 95.3%  Memory: 450 MB
+  Path: C:\Program Files\Google\Chrome\Application\chrome.exe
+```
+
+### 6.3 日志轮转
+当日志文件大小超过 `LogMaxSizeBytes` 时，会将其先重命名为临时文件，再重命名为 `monitor.log.old`（覆盖任何之前的旧日志），最后创建新的 `monitor.log`。轮转检查在每个扫描周期（监控激活时）之前进行。如果重命名失败（例如文件被占用），程序会尝试最多 10 次，每次等待时间递增；如果仍然失败，程序会尝试截断当前日志文件，并弹出气球提示建议关闭占用程序。程序退出时会自动清理可能残留的临时文件。
+
+---
+
+## 7. 故障排除
+
+### 7.1 程序无法启动
+- 可能已有另一个实例在运行（每个用户会话只允许一个实例）。
+- 如果需要，请以管理员身份运行。
+- 检查您的杀毒软件是否阻止了该可执行文件。
+
+### 7.2 进程未被终止
+- 验证阈值：CPU 阈值是所有核心的总 CPU 时间。
+- 确保该进程不在内置系统排除列表或您的自定义排除列表中。
+- 检查 `monitor.log` 中是否有“access denied”或错误码5的消息。如果有，说明程序权限不足，请以管理员身份运行。
+- 如果一个进程因资源异常达到终止条件但终止失败多次，程序会在尝试 5 次后停止尝试（记录一次日志）。
+
+### 7.3 日志文件未创建或未更新
+- 确保程序在其文件夹中有写入权限。如果启动时有“文件夹不可写”警告，请将程序移动到可写位置或以管理员身份运行。
+- 检查磁盘是否已满。
+- 查看气球提示或日志中的错误消息（如果存在）。
+
+### 7.4 配置更改未应用
+- 程序每 5 秒检查一次配置文件。保存后请等待最多 5 秒。
+- 验证文件是否以 ANSI 编码保存。如果文件包含 BOM 或非 ASCII 字符，程序会每周弹出一次警告。
+- 检查 `monitor.log` 中是否有关于重载失败或值钳位的消息。
+
+### 7.5 日志轮转失败
+- 确保程序可以在其文件夹中删除和重命名文件（即文件夹可写）。
+- 如果其他程序（如文本编辑器）打开了 `monitor.log`，请先关闭它。
+- 程序会重试重命名最多 10 次，每次等待时间递增。如果轮转反复失败，程序将截断当前日志文件。
+- 如果问题持续，可以尝试重启电脑。
+
+### 7.6 路径显示为 `\Device\HarddiskVolume3\...`
+这是 NT 原生路径格式。程序尝试将其转换为 DOS 路径（如 `C:\...`）。如果转换失败，将显示原生路径。
+
+### 7.7 我看到“SUSPICIOUS SYSTEM PROCESS”警告
+这些警告表明关键系统进程正在使用过多资源，或者其窗口挂起，这可能是恶意软件的迹象，也可能是正常系统活动（如系统更新）。请通过检查其完整路径来确认，如果不确定可以忽略。
+
+### 7.8 程序运行缓慢或占用高 CPU
+- 确保运行的是最新版本。挂起窗口检测超时可以调高以减少扫描开销；尝试将 `HangTimeoutMs` 设为更高值（例如 10000 毫秒）。另外，如果系统中有大量窗口，您可以减小 `MaxHungWindows` 的值。
+- 如果日志中出现“Reached maximum number of windows to check”的警告，说明您的窗口数量超过了 `MaxHungWindows`，可以适当增大该值以覆盖更多窗口。
+
+### 7.9 启动时提示“文件夹不可写”
+- 程序所在文件夹没有写入权限。请将程序移动到有写入权限的文件夹（如桌面、文档目录），或以管理员身份运行。否则配置和日志文件无法保存，程序功能会受限。
+
+---
+
+## 8. 卸载
+
+要卸载，只需从程序文件夹中删除以下文件：
+- `ProcessMonitor.exe`
+- `config.ini`（如果您想保留以供将来使用，可以保存一份副本）
+- `monitor.log`（可选）
+- `monitor.log.old`（可选）
+- `README.txt`（自动创建的简易手册，可选）
+
+不会修改任何注册表项或系统文件。
+
+---
+
+## 9. 常见问题解答 (FAQ)
+
+**问：为什么程序需要管理员权限？**  
+答：终止属于其他用户或系统进程的进程需要高权限。没有管理员权限，程序仍然可以监控，但许多受保护的进程将无法访问。
+
+**问：CPU 使用率是如何计算的？**  
+答：对于正常进程，程序使用高精度性能计数器计算两个样本之间的 CPU 时间差。对于系统进程异常检测，它同时使用瞬时 CPU（两个样本间）和自进程启动以来的平均 CPU 使用率，提高检测灵敏度。
+
+**问：我可以按完整路径排除进程吗？**  
+答：不能。排除仅基于文件名（例如“notepad.exe”）。这可以防止意外排除不同位置的同名可执行文件。
+
+**问：程序支持排除列表中的通配符吗？**  
+答：不支持。仅支持精确的文件名匹配（不区分大小写）。如果输入通配符，条目会被忽略并记录警告。
+
+**问：如何验证程序是否正常工作？**  
+答：您可以通过运行超过阈值的 CPU 密集型应用程序（如 CPU 压力测试）来测试。程序应终止它并记录事件。
+
+**问：程序会影响系统性能吗？**  
+答：影响极小。它以配置的间隔（默认 5 秒）进行扫描，并且每个进程只执行几个 API 调用。
+
+**问：启动时自动监控如何设置？**  
+答：在 `config.ini` 中设置 `StartMonitoringOnLaunch=1`（默认）即可自动开始，设为 0 则启动后处于停止状态。
+
+**问：如何启用普通进程终止时的气泡提示？**  
+答：在 `config.ini` 中设置 `NotifyOnTermination=1`。
+
+**问：我不小心删除了手册文件，如何找回？**  
+答：程序会在启动时检查手册是否存在，如果缺失会自动创建一个简易的 `README.txt` 包含基本用法。要获取完整手册，请重新下载程序压缩包。
+
+**问：为什么启动时提示文件夹不可写？**  
+答：程序需要在当前文件夹创建配置文件、日志文件等。如果文件夹没有写入权限（例如在系统保护目录如 `C:\Program Files`），程序会发出警告。请将程序移到有写入权限的文件夹（如桌面）或以管理员身份运行。
+
+**问：如何更换托盘图标？**  
+答：从版本 0.46 开始，程序不再支持自定义图标，统一使用 Windows 默认图标，以简化代码和避免兼容性问题。
+
+---
+
+## 10. 版本 0.48 更新内容
+
+- **改进**：删除了未使用的变量 `g.hTrayIcon`，使代码更简洁。
+- **改进**：在 `wWinMain` 开头保留 `FreeConsole()` 调用，确保控制台窗口彻底隐藏（兼容 MinGW 等环境）。
+- **优化**：代码结构小幅优化，提升可维护性。
+
+---
+
+## 11. 已知潜在问题
+
+尽管版本 0.48 已经非常完善，但仍存在一些已知限制或潜在问题，供您参考：
+
+1. **无法终止某些受保护的系统进程**  
+   - 即使进程伪装成系统进程（同名但不在系统目录），程序仍可能因权限不足（如 TrustedInstaller 保护）而无法终止。这属于 Windows 安全机制，无法绕过。
+
+2. **排除列表不支持通配符和路径**  
+   - 仅支持精确的文件名匹配。如果您需要排除同一名称但位于不同路径的进程，当前机制可能不够灵活。建议使用英文进程名。
+
+3. **配置文件编码要求严格**  
+   - 程序依赖 Windows INI API，因此配置文件必须保存为 ANSI（系统默认代码页）才能正确读取非英文字符。如果您的系统代码页不支持某些字符，可能导致排除列表失效。程序会每周提示一次，请按照提示操作。
+
+4. **挂起窗口检测在窗口数量极大时可能耗时较长**  
+   - 尽管有 `MaxHungWindows` 限制，但如果系统中有数千个窗口（例如某些自动化工具或浏览器扩展），扫描仍可能占用数百毫秒。您可以通过减小 `HangTimeoutMs` 或 `MaxHungWindows` 来缓解。当日志中出现相关警告时，请考虑调整参数。
+
+5. **日志文件可能被其他程序锁定**  
+   - 如果 `monitor.log` 被文本编辑器或其他程序打开，日志轮转可能失败。程序会尝试多次并最终截断文件，但部分日志可能丢失。建议不要在编辑日志时让程序运行。
+
+6. **内存分配失败可能导致跳过部分进程**  
+   - 在极端低内存条件下，程序可能无法为历史记录或挂起列表分配内存，从而导致某些进程被跳过。日志中会记录相应错误。
+
+7. **快速用户切换或远程桌面会话**  
+   - 每个会话有独立的实例，但若多个会话同时运行，每个会话的日志和配置相互独立，不会冲突。建议每个用户使用自己的程序副本以避免日志交错。
+
+8. **某些防病毒软件可能误报**  
+   - 由于程序需要终止其他进程，某些敏感的安全软件可能将其误判为恶意行为。请将程序添加到信任列表。
+
+9. **系统进程瞬时 CPU 检测依赖历史记录**  
+   - 对于新启动的系统进程，第一次扫描可能没有历史记录，此时无法计算瞬时 CPU，会退回到平均 CPU。这可能导致短暂的漏检，但通常影响不大。
+
+10. **排除列表条目超长时被截断**  
+    - 如果某个条目长度超过 260 字符，将被截断至 259 字符，可能导致排除失效。程序会弹出气球提示并记录日志。请确保条目长度不超过 259 字符。
+
+11. **程序目录无写入权限时配置和日志无法保存**  
+    - 如果程序所在文件夹没有写入权限，启动时会弹出警告。此时配置文件无法创建/修改，日志无法记录。请将程序移到有写入权限的文件夹或以管理员身份运行。这是用户操作问题，程序已提供明确提示。
+
+12. **PID 重用可能导致短暂的历史误判（理论问题）**  
+    - 极低概率下，进程退出后同一 PID 被新进程快速复用，旧历史可能误关联到新进程。程序通过 `seen` 机制在每次扫描中更新历史，已尽量降低影响，用户通常无需担心。
+
+---
+
+# Process Monitor User Manual
+## Version 0.48
+
+---
+
+## Table of Contents
+1. Overview  
+2. System Requirements  
+3. Installation and Running  
+4. Configuration File (config.ini)  
+5. How to Use  
+6. Log File (monitor.log)  
+7. Troubleshooting  
+8. Uninstallation  
+9. Frequently Asked Questions (FAQ)  
+10. What's New in Version 0.48  
+11. Known Potential Issues  
+
+---
+
+## 1. Overview
+
+Process Monitor is a lightweight system tray tool that automatically detects and terminates abnormal processes (based on high CPU usage, high memory usage, or unresponsive windows). All actions are recorded in `monitor.log` (UTF-8 encoding) with automatic log rotation. You can customize monitoring parameters and exclusion lists via `config.ini`. Configuration changes are automatically reloaded without restarting the program.
+
+**Key Features:**
+- Real-time monitoring of all running processes.
+- Terminates processes exceeding CPU, memory, or hang thresholds.
+- Built-in system process protection (critical system processes are never terminated, but anomalies are logged and a balloon tip is shown, at most once per 5 minutes per process).
+- User-definable exclusion list.
+- Automatic log rotation to prevent unlimited log growth.
+- Dynamic configuration reload – no restart required.
+- Single instance per user session.
+- Minimal resource usage.
+- Balloon tip frequency limiting to avoid annoyance.
+- Automatic monitoring on launch (configurable).
+- System process anomaly detection includes instantaneous CPU usage for better sensitivity.
+- Configuration encoding warnings appear at most once per week.
+- Creates a simple README if the manual file is missing.
+- Checks folder writability on startup and warns if not.
+- Automatically cleans up temporary log files on exit.
+- No console window is shown; the program resides only in the system tray.
+
+---
+
+## 2. System Requirements
+
+- **Operating System**: Windows Vista, Windows 7, Windows 8, Windows 10, Windows 11 (32-bit or 64-bit).
+- **Hardware**: At least 50 MB free RAM, 10 MB disk space.
+- **Privileges**: Administrator rights are recommended to terminate most processes. Without admin rights, the program can only monitor and terminate processes owned by the current user.
+
+---
+
+## 3. Installation and Running
+
+### 3.1 Installation
+- Place `ProcessMonitor.exe` in any folder (preferably an English path without spaces or special characters).
+- No installation needed; just run the executable.
+
+### 3.2 First Run
+- On first start, the program creates a default `config.ini` in the same folder. This file is saved in ANSI encoding for correct reading.
+- The log file `monitor.log` is created when the first event occurs.
+- The program starts minimized to the system tray (near the clock) with no visible window.
+- If you are not running as administrator, a warning will appear; you can still use the program, but some processes may not be terminated.
+- By default, monitoring starts automatically after launch (can be disabled in config).
+- If the manual file `monitor_manual.txt` is missing, the program will create a simple `README.txt` with basic instructions.
+- On startup, the program checks if the current folder is writable. If not, a warning message will appear, indicating that configuration and log files may not be saved. Please place the program in a writable folder or run as administrator.
+
+### 3.3 Run as Administrator
+Right-click the executable and select "Run as administrator", or set it in compatibility settings to always run as administrator.
+
+### 3.4 Multiple Instances
+Only one instance per user session is allowed. Attempting to start a second instance will show a message box and exit.
+
+---
+
+## 4. Configuration File (config.ini)
+
+The configuration file is a standard Windows INI file. It **must** be saved in ANSI encoding (system default code page) because the program uses Windows INI APIs. If you use other editors (e.g., Notepad++), save as ANSI format. UTF-8 without BOM may cause non-ASCII characters to be read incorrectly. The program will show a balloon warning at most once per week if encoding issues are detected.
+
+### 4.1 Default Configuration
+On first run, the program creates `config.ini` with the following content:
+
+```
+[Settings]
+MonitorIntervalMs=5000
+CpuThresholdPercent=80
+MemThresholdMb=500
+HangTimeoutMs=5000
+LogMaxSizeBytes=1048576
+MaxHungWindows=500
+NotifyOnTermination=0
+StartMonitoringOnLaunch=1
+ExcludeProcesses=
+
+; Process Monitor Configuration File
+; All times are in milliseconds.
+; Edit values as needed. The program will automatically reload changes.
+; StartMonitoringOnLaunch: 1 to start monitoring automatically, 0 to start stopped.
+; NotifyOnTermination: 1 to show a balloon when a normal process is terminated, 0 to only log.
+; ExcludeProcesses: comma or semicolon separated list (e.g., notepad.exe,calc.exe)
+; Note: CPU threshold is total process CPU time (may exceed 100% on multi-core).
+; MaxHungWindows: limit number of windows to check for hanging (10-5000).
+; IMPORTANT: Save this file in ANSI encoding (system default code page).
+; If you use UTF-8 without BOM, non-ASCII characters may not be read correctly.
+```
+
+### 4.2 Parameter Descriptions
+
+| Parameter | Description | Range | Default |
+|-----------|-------------|-------|---------|
+| MonitorIntervalMs | Scan interval in milliseconds | 1000 – 60000 | 5000 |
+| CpuThresholdPercent | CPU usage threshold (total across all cores) | 1 – 100 | 80 |
+| MemThresholdMb | Memory usage threshold in MB | 1 – 65536 | 500 |
+| HangTimeoutMs | Timeout for detecting hung windows (ms) | 1000 – 30000 | 5000 |
+| LogMaxSizeBytes | Maximum log file size in bytes | 1024 – 104857600 | 1048576 (1 MB) |
+| MaxHungWindows | Maximum number of windows to check per scan | 10 – 5000 | 500 |
+| NotifyOnTermination | Whether to show a balloon when a normal process is terminated | 0 or 1 | 0 |
+| StartMonitoringOnLaunch | Whether to start monitoring automatically on launch | 0 or 1 | 1 |
+| ExcludeProcesses | List of process names to never terminate (comma/semicolon separated, file names only) | Max 32 items | empty |
+
+**Notes:**
+- CPU threshold: On multi-core systems, a single thread fully occupying one core shows 100%, two full cores show 200%. The threshold is an absolute value.
+- Exclusion list supports only file names (e.g., `notepad.exe`). If an entry contains a path separator (`\` or `/`), it is ignored and a balloon warning is shown (and logged).
+- Built-in system processes are always excluded from termination, but only if they run from system directories.
+
+### 4.3 Dynamic Reloading
+The program checks the configuration file every 5 seconds. If the file is modified, settings are automatically reloaded. If reload fails, previous settings remain and an error is logged. Successful reloads are silent (only failures trigger a balloon tip every 10 minutes).
+
+---
+
+## 5. How to Use
+
+### 5.1 System Tray Icon
+The program resides in the system tray (notification area) using the default Windows application icon.
+
+### 5.2 Mouse Operations
+- **Double-click left**: Shows a message box displaying the program version and current monitoring status (ON or OFF).
+- **Right-click**: Opens a context menu with all operation options.
+
+### 5.3 Context Menu Options
+
+| Option | Description |
+|--------|-------------|
+| Start Monitoring | Starts scanning processes according to the current configuration. A checkmark appears when active. |
+| Stop Monitoring | Pauses scanning. No processes are checked until monitoring is restarted. |
+| View Log | Opens `monitor.log` with the default text editor. |
+| Edit Config | Opens `config.ini` with the default editor. |
+| View Manual | Opens this manual `monitor_manual.txt` (if exists), otherwise shows a message. |
+| Exit | Terminates the program. |
+
+---
+
+## 6. Log File (monitor.log)
+
+The log file is stored in the same folder as the executable, in UTF-8 encoding. Each log entry includes a timestamp, the action taken, and detailed information.
+
+### 6.1 Log Entry Format
+
+**Normal termination (memory available):**
+```
+[YYYY-MM-DD HH:MM:SS] Terminated process: <name> (PID <pid>)
+  Reason: <reason>
+  CPU: <value>%  Memory: <value> MB
+  Path: <full executable path>
+```
+
+**System process anomaly (memory available):**
+```
+[YYYY-MM-DD HH:MM:SS] SUSPICIOUS SYSTEM PROCESS: <name> (PID <pid>)
+  Reason: <reason>
+  CPU: <value>%  Memory: <value> MB
+  Path: <full executable path>
+  This may indicate malware infection. (If this is normal system activity, you can ignore this warning.)
+```
+
+### 6.2 Example
+```
+[2025-03-21 14:30:15] Terminated process: chrome.exe (PID 1234)
+  Reason: High CPU: 95.3% (threshold 80%)
+  CPU: 95.3%  Memory: 450 MB
+  Path: C:\Program Files\Google\Chrome\Application\chrome.exe
+```
+
+### 6.3 Log Rotation
+When the log file size exceeds `LogMaxSizeBytes`, it is first renamed to a temporary file, then to `monitor.log.old` (overwriting any previous old log), and finally a new `monitor.log` is created. Rotation is checked before each scan cycle (when monitoring is active). If renaming fails (e.g., file locked), the program retries up to 10 times with increasing delays; if still failing, it truncates the current log and shows a balloon tip suggesting to close the locking program. On exit, the program automatically cleans up any leftover temporary files.
+
+---
+
+## 7. Troubleshooting
+
+### 7.1 Program Won't Start
+- Another instance may already be running.
+- Run as administrator if needed.
+- Check if your antivirus is blocking the executable.
+
+### 7.2 Processes Not Terminated
+- Verify thresholds: CPU threshold is total CPU time across all cores.
+- Ensure the process is not in the built-in system exclusion list or your custom exclude list.
+- Check `monitor.log` for "access denied" or error code 5 messages. If present, run as administrator.
+- If termination fails multiple times, the program stops trying after 5 attempts (logs once).
+
+### 7.3 Log File Not Created or Not Updated
+- Ensure the program has write permissions in its folder. If a "folder not writable" warning appeared at startup, move the program to a writable location or run as administrator.
+- Check if the disk is full.
+- Look for balloon tips or error messages in the log.
+
+### 7.4 Configuration Changes Not Applied
+- The program checks the config file every 5 seconds. Wait up to 5 seconds after saving.
+- Verify the file is saved in ANSI encoding. If it contains a BOM or non-ASCII characters, a balloon warning will appear at most once per week.
+- Check `monitor.log` for messages about reload failure or value clamping.
+
+### 7.5 Log Rotation Fails
+- Ensure the program can delete and rename files in its folder (folder must be writable).
+- If another program has `monitor.log` open, close it first.
+- The program retries up to 10 times with increasing delays. If still failing, it truncates the current log.
+- If the problem persists, try restarting your computer.
+
+### 7.6 Path Shows as `\Device\HarddiskVolume3\...`
+This is a native NT path format. The program attempts to convert it to a DOS path (e.g., `C:\...`). If conversion fails, the native path is displayed.
+
+### 7.7 I See "SUSPICIOUS SYSTEM PROCESS" Warnings
+These warnings indicate that a critical system process is using excessive resources or has a hung window, which could be a sign of malware or normal system activity (e.g., updates). Check the full path to verify; if unsure, you can ignore.
+
+### 7.8 Program Runs Slowly or Uses High CPU
+- Ensure you are running the latest version. Increase `HangTimeoutMs` to reduce scan overhead, or reduce `MaxHungWindows` to limit window checks.
+- If you see a log warning "Reached maximum number of windows to check", your window count exceeds `MaxHungWindows`; consider increasing this value.
+
+### 7.9 Startup Warning "Folder Not Writable"
+- The program folder lacks write permissions. Move the program to a writable folder (e.g., Desktop, Documents) or run as administrator. Otherwise, configuration and log files cannot be saved, and program functionality will be limited.
+
+---
+
+## 8. Uninstallation
+
+To uninstall, simply delete the following files from the program folder:
+- `ProcessMonitor.exe`
+- `config.ini` (optional backup)
+- `monitor.log` (optional)
+- `monitor.log.old` (optional)
+- `README.txt` (optional, auto-created)
+
+No registry entries or system files are modified.
+
+---
+
+## 9. Frequently Asked Questions (FAQ)
+
+**Q: Why does the program need administrator privileges?**  
+A: Terminating processes owned by other users or system processes requires high privileges. Without admin rights, the program can still monitor but may not terminate protected processes.
+
+**Q: How is CPU usage calculated?**  
+A: For normal processes, the program uses high-precision performance counters to calculate CPU time difference between two samples. For system processes, it uses both instantaneous (between samples) and average CPU usage since process start for better sensitivity.
+
+**Q: Can I exclude a process by full path?**  
+A: No. Exclusion is based only on the file name. This prevents accidentally excluding the same executable from different locations.
+
+**Q: Does the program support wildcards in the exclusion list?**  
+A: No. Only exact file name matching is supported (case-insensitive). Entries with wildcards are ignored and logged.
+
+**Q: How can I verify the program is working?**  
+A: Test by running a CPU-intensive application (e.g., a CPU stress test) that exceeds the threshold. The program should terminate it and log the event.
+
+**Q: Does the program affect system performance?**  
+A: Minimal. It scans at configured intervals and performs only a few API calls per process.
+
+**Q: How do I set automatic monitoring on launch?**  
+A: Set `StartMonitoringOnLaunch=1` in `config.ini` (default) to start automatically, or 0 to start stopped.
+
+**Q: How do I enable balloon notifications for normal process termination?**  
+A: Set `NotifyOnTermination=1` in `config.ini`.
+
+**Q: I accidentally deleted the manual file. How can I get it back?**  
+A: The program will create a simple `README.txt` on startup with basic instructions. For the full manual, please re-download the program package.
+
+**Q: Why does the program warn about folder not writable on startup?**  
+A: The program needs to create configuration and log files in its folder. If the folder is not writable (e.g., in system-protected locations like `C:\Program Files`), a warning appears. Move the program to a writable folder (like Desktop) or run as administrator.
+
+**Q: How can I change the tray icon?**  
+A: Starting from version 0.46, the program no longer supports custom icons and uses the default Windows icon for simplicity and compatibility.
+
+---
+
+## 10. What's New in Version 0.48
+
+- **Improved**: Removed unused variable `g.hTrayIcon` for cleaner code.
+- **Improved**: Retained `FreeConsole()` call at the beginning of `wWinMain` to ensure console window is hidden (compatible with MinGW and other environments).
+- **Optimized**: Minor code structure improvements for better maintainability.
+
+---
+
+## 11. Known Potential Issues
+
+Despite the improvements in version 0.48, some limitations or potential issues remain:
+
+1. **Inability to terminate certain protected system processes**  
+   - Even if a process masquerades as a system process (same name but not in system directories), it may still be protected by Windows mechanisms (e.g., TrustedInstaller) and cannot be terminated.
+
+2. **Exclusion list does not support wildcards or paths**  
+   - Only exact file name matching is supported. Use English process names for best compatibility.
+
+3. **Strict configuration file encoding requirement**  
+   - The program relies on Windows INI APIs, so the config file must be saved in ANSI (system default code page) for correct reading of non-ASCII characters. Weekly warnings are shown; follow the instructions to save as ANSI.
+
+4. **Hung window detection may be slow with extremely many windows**  
+   - Although `MaxHungWindows` limits the number checked, thousands of windows could still cause delays. Adjust `HangTimeoutMs` or `MaxHungWindows` as needed. A log warning will appear if the limit is reached.
+
+5. **Log file may be locked by another program**  
+   - If `monitor.log` is opened by a text editor, log rotation may fail. The program will retry and eventually truncate, but some log entries may be lost. Avoid editing the log while the program is running.
+
+6. **Memory allocation failures may skip some processes**  
+   - Under extreme low-memory conditions, the program may fail to allocate memory for history or hung process lists, causing some processes to be skipped. Errors are logged.
+
+7. **Fast user switching or remote desktop sessions**  
+   - Each session runs its own instance independently; logs and configurations are separate and do not conflict. It is recommended that each user use their own copy of the program to avoid log interleaving.
+
+8. **Possible false positives from antivirus software**  
+   - Because the program terminates other processes, some sensitive security software may flag it as malicious. Add the program to your antivirus whitelist.
+
+9. **System process instantaneous CPU detection depends on history**  
+   - For newly started system processes, the first scan may lack history, falling back to average CPU. This may cause brief missed detections but is usually not significant.
+
+10. **Exclude list entries longer than 260 characters are truncated**  
+    - If an entry exceeds 260 characters, it is truncated to 259, which may cause the exclusion to fail. A balloon warning is shown and a log is written. Keep entries short.
+
+11. **Configuration and log files may not be saved if the folder is not writable**  
+    - If the program folder lacks write permissions, a warning is shown at startup. The user must move the program or run as administrator to ensure proper functionality. This is a user-actionable issue, and the program provides clear guidance.
+
+12. **PID reuse may cause brief history misassociation (theoretical)**  
+    - In extremely rare cases, a new process might reuse a PID of a recently exited process, potentially associating old history with the new process. The program's `seen` mechanism mitigates this; users generally need not worry.
+
+---
+
+**End of User Manual**
