@@ -133,3 +133,5 @@ cl ProcessMonitor.c /FeProcessMonitor.exe /link psapi.lib shell32.lib user32.lib
 **如果这个项目对你有帮助，请给一个 ⭐️ 吧！**
 
 ```
+
+Note: This project was developed with the assistance of AI tools (e.g., GitHub Copilot, ChatGPT) for code suggestions and documentation.
